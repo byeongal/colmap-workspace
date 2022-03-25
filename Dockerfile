@@ -25,14 +25,36 @@ RUN apt-get update --yes && \
     apt-get upgrade --yes && \
     apt-get install --yes --no-install-recommends \
 	apt-utils \
+	build-essential \
 	ca-certificates \
+	ccache \
+	cmake \
 	curl \
 	fonts-liberation \
+	git \
+	libboost-filesystem-dev \
+	libboost-graph-dev \
+	libboost-program-options-dev \
+	libboost-system-dev \
+	libboost-test-dev \
+	libcgal-dev \
+	libcgal-qt5-dev \
+	libeigen3-dev \
+	libfreeimage-dev \
+	libgflags-dev \
+	libglew-dev \
+	libgoogle-glog-dev \
+	libjpeg-dev \
+	libpng-dev \
+	libqt5opengl5-dev \
+	libsuitesparse-dev \
 	locales \
 	pandoc \
+	qtbase5-dev \
 	run-one \
 	sudo \
 	tini \
+	vim \
 	wget && \
     echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
     locale-gen && \
@@ -54,6 +76,7 @@ RUN chmod a+rwx /usr/bin/clean-layer.sh && chmod a+rwx /usr/bin/fix-permissions.
 ENV \
     CONDA_DIR=/opt/conda \
     CONDA_ROOT=/opt/conda
+ENV PATH="${CONDA_DIR}/bin:${PATH}"
 ARG \
     PYTHON_VERSION=default \
     CONDA_MIRROR=https://github.com/conda-forge/miniforge/releases/latest/download
@@ -74,10 +97,60 @@ RUN set -x && \
     # Using conda to update all packages: https://github.com/mamba-org/mamba/issues/1092
     $CONDA_ROOT/bin/conda update --all --quiet --yes && \
     $CONDA_ROOT/bin/conda clean --all -f -y && \
-    # Link Conda
-    ln -s $CONDA_ROOT/bin/python /usr/local/bin/python && \
-    ln -s $CONDA_ROOT/bin/pip /usr/bin/pip && \
-    ln -s $CONDA_ROOT/bin/conda /usr/bin/conda && \
-    ln -s $CONDA_ROOT/bin/mamba /usr/bin/mamba && \
     fix-permissions.sh $CONDA_ROOT && \
     clean-layer.sh
+
+# Install Jupyter
+RUN mamba install --quiet --yes \
+    'notebook' \
+    'jupyterhub' \
+    'jupyterlab' && \
+    mamba clean --all -f -y && \
+    npm cache clean --force && \
+    jupyter notebook --generate-config && \
+    jupyter lab clean && \
+    fix-permissions.sh $CONDA_ROOT && \
+    clean-layer.sh
+
+# Notebook Branding
+COPY branding/logo.png /tmp/logo.png
+COPY branding/favicon.ico /tmp/favicon.ico
+RUN /bin/bash -c 'cp /tmp/logo.png $(python -c "import sys; print(sys.path[-1])")/notebook/static/base/images/logo.png'
+RUN /bin/bash -c 'cp /tmp/favicon.ico $(python -c "import sys; print(sys.path[-1])")/notebook/static/base/images/favicon.ico'
+RUN /bin/bash -c 'cp /tmp/favicon.ico $(python -c "import sys; print(sys.path[-1])")/notebook/static/favicon.ico'
+
+# Install colmap
+RUN git clone https://github.com/ceres-solver/ceres-solver.git --branch 1.14.0
+RUN cd ceres-solver && \
+	mkdir build && \
+	cd build && \
+	cmake .. -DBUILD_TESTING=OFF -DBUILD_EXAMPLES=OFF && \
+	make -j4 && \
+	make install && \
+    clean-layer.sh
+
+RUN git clone https://github.com/colmap/colmap.git --branch 3.7
+
+RUN cd colmap && \
+	mkdir build && \
+	cd build && \
+	cmake .. && \
+	make -j4 && \
+	make install && \
+    clean-layer.sh
+
+# /workspace
+# Make folders
+RUN \
+    if [ -e $WORKSPACE_HOME ] ; then \
+    chmod a+rwx $WORKSPACE_HOME; \
+    else \
+    mkdir $WORKSPACE_HOME && chmod a+rwx $WORKSPACE_HOME; \
+    fi
+ENV HOME=$WORKSPACE_HOME
+WORKDIR $WORKSPACE_HOME
+
+### Start Ainize Worksapce ###
+COPY start.sh /scripts/start.sh
+RUN ["chmod", "+x", "/scripts/start.sh"]
+CMD "/scripts/start.sh"
