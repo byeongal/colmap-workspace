@@ -74,5 +74,10 @@ RUN set -x && \
     # Using conda to update all packages: https://github.com/mamba-org/mamba/issues/1092
     $CONDA_ROOT/bin/conda update --all --quiet --yes && \
     $CONDA_ROOT/bin/conda clean --all -f -y && \
+    # Link Conda
+    ln -s $CONDA_ROOT/bin/python /usr/local/bin/python && \
+    ln -s $CONDA_ROOT/bin/pip /usr/bin/pip && \
+    ln -s $CONDA_ROOT/bin/conda /usr/bin/conda && \
+    ln -s $CONDA_ROOT/bin/mamba /usr/bin/mamba && \
     fix-permissions.sh $CONDA_ROOT && \
     clean-layer.sh
